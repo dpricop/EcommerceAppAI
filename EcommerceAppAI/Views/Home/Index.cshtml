@@ -1,8 +1,215 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+ViewData["Title"] = "AI Chat";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="chat-container">
+    <div class="chat-messages" id="chatMessages">
+        <!-- Messages will be added here dynamically -->
+    </div>
+
+    <div class="input-container">
+        <div class="text-field">
+            <input type="text" id="messageInput" placeholder="Type your message here..." />
+        </div>
+
+        <button class="send-button" id="sendButton">
+            <span class="material-icons">send</span>
+            Send
+        </button>
+    </div>
 </div>
+
+@section Scripts {
+<!-- SignalR CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.0/signalr.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatMessages = document.getElementById('chatMessages');
+
+        let currentStreamingMessage = null;
+
+        // Initialize SignalR connection
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/chathub")
+            .withAutomaticReconnect()
+            .build();
+
+        // Connection event handlers
+        connection.onclose(() => updateConnectionStatus('disconnected'));
+        connection.onreconnecting(() => updateConnectionStatus('connecting'));
+        connection.onreconnected(() => updateConnectionStatus('connected'));
+
+        function updateConnectionStatus(status) {
+            const statusIndicator = document.getElementById('headerStatusIndicator');
+            if (!statusIndicator) return;
+
+            statusIndicator.className = 'header-status-chip';
+            const icon = statusIndicator.querySelector('.material-icons');
+            const text = statusIndicator.querySelector('span:last-child');
+
+            switch(status) {
+                case 'connected':
+                    statusIndicator.classList.add('status-connected');
+                    icon.textContent = 'wifi';
+                    text.textContent = 'Connected';
+                    sendButton.disabled = false;
+                    messageInput.disabled = false;
+                    break;
+                case 'connecting':
+                    statusIndicator.classList.add('status-connecting');
+                    icon.textContent = 'wifi_off';
+                    text.textContent = 'Connecting...';
+                    sendButton.disabled = true;
+                    messageInput.disabled = true;
+                    break;
+                case 'disconnected':
+                    statusIndicator.classList.add('status-disconnected');
+                    icon.textContent = 'wifi_off';
+                    text.textContent = 'Disconnected';
+                    sendButton.disabled = true;
+                    messageInput.disabled = true;
+                    break;
+            }
+        }
+
+        // Message handlers
+        connection.on("ReceiveMessage", function (message, sender, timestamp) {
+            addMessage(message, sender === 'user', new Date(timestamp));
+        });
+
+        connection.on("StartMessage", function (timestamp) {
+            currentStreamingMessage = createStreamingMessage(new Date(timestamp));
+        });
+
+        connection.on("ReceiveChunk", function (chunk) {
+            if (currentStreamingMessage) {
+                appendToStreamingMessage(currentStreamingMessage, chunk);
+            }
+        });
+
+        connection.on("FinalizeMessage", function () {
+            if (currentStreamingMessage) {
+                currentStreamingMessage.classList.remove('streaming-message');
+                currentStreamingMessage.classList.add('ai-message');
+                currentStreamingMessage = null;
+            }
+        });
+
+        connection.on("TypingIndicator", function (isTyping) {
+            toggleTypingIndicator(isTyping);
+        });
+
+        connection.on("ReceiveError", function (error) {
+            addMessage(`Error: ${error}`, false, new Date());
+            removeTypingIndicator();
+        });
+
+        function addMessage(message, isUser = false, timestamp = new Date()) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+
+            messageDiv.innerHTML = `
+                    <div>${escapeHtml(message)}</div>
+                    <div class="timestamp">${timestamp.toLocaleTimeString()}</div>
+                `;
+
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function createStreamingMessage(timestamp) {
+            removeTypingIndicator();
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message streaming-message';
+            messageDiv.innerHTML = `
+                    <div class="content"></div>
+                    <div class="timestamp">${timestamp.toLocaleTimeString()}</div>
+                `;
+
+            chatMessages.appendChild(messageDiv);
+            scrollToBottom();
+
+            return messageDiv;
+        }
+
+        function appendToStreamingMessage(messageDiv, chunk) {
+            const contentDiv = messageDiv.querySelector('.content');
+            contentDiv.textContent += chunk;
+            scrollToBottom();
+        }
+
+        function toggleTypingIndicator(show) {
+            removeTypingIndicator();
+
+            if (show) {
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'typing-indicator';
+                typingDiv.id = 'typing-indicator';
+                typingDiv.innerHTML = `
+                        <div class="typing-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <span style="margin-left: 8px;">AI is thinking...</span>
+                    `;
+                chatMessages.appendChild(typingDiv);
+                scrollToBottom();
+            }
+        }
+
+        function removeTypingIndicator() {
+            const typing = document.getElementById('typing-indicator');
+            if (typing) typing.remove();
+        }
+
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || connection.state !== signalR.HubConnectionState.Connected) return;
+
+            messageInput.value = '';
+            currentStreamingMessage = null;
+
+            try {
+                await connection.invoke("SendMessage", message);
+            } catch (err) {
+                console.error('Error sending message:', err);
+                addMessage('Failed to send message. Please try again.', false, new Date());
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Start connection
+        updateConnectionStatus('connecting');
+        connection.start()
+            .then(() => updateConnectionStatus('connected'))
+            .catch(err => {
+                console.error('SignalR connection error:', err);
+                updateConnectionStatus('disconnected');
+            });
+    });
+</script>
+}

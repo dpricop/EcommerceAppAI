@@ -1,22 +1,104 @@
-html {
-  font-size: 14px;
+
+.chat-container {
+  max-width: 800px;
+  margin: 0 auto;
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
+.chat-messages {
+  height: 500px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+}
+
+.message {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  max-width: 80%;
+  word-wrap: break-word;
+  opacity: 0;
+  animation: fadeIn 0.3s ease-in forwards;
+}
+
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+
+.user-message {
+  background-color: #007bff;
+  color: white;
+  margin-left: auto;
+  text-align: right;
+}
+
+.ai-message {
+  background-color: #e9ecef;
+  color: #495057;
+  margin-right: auto;
+}
+
+.streaming-message {
+  background-color: #e9ecef;
+  color: #495057;
+  margin-right: auto;
+  border-left: 3px solid #007bff;
+}
+
+.timestamp {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 0.25rem;
+}
+
+.typing-indicator {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #e9ecef;
+  border-radius: 0.375rem;
+  max-width: 80%;
+  margin-right: auto;
+}
+
+.typing-dots {
+  display: inline-block;
+}
+
+.typing-dots span {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #6c757d;
+  margin: 0 2px;
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+.typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typing {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+#messageInput:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
-html {
-  position: relative;
-  min-height: 100%;
+.connection-status {
+  font-size: 0.875rem;
 }
 
-body {
-  margin-bottom: 60px;
-}
+.bg-connected { background-color: #28a745 !important; }
+.bg-disconnected { background-color: #dc3545 !important; }
+.bg-connecting { background-color: #ffc107 !important; }

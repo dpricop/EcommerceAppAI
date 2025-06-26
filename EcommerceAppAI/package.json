@@ -1,0 +1,8 @@
+{
+  "name": "ecommerce-app-ai",
+  "version": "1.0.0",
+  "description": "AI Chat Application with Material Design 3",
+  "dependencies": {
+    "@material/web": "^1.0.1"
+  }
+}

@@ -7,3 +7,7 @@ riderModule.iml
 # JetBrains Rider
 .idea/
 *.sln.iml
+
+/EcommerceAppAI/node_modules/
+/EcommerceAppAI/bin 
+/EcommerceAppAI/obj 

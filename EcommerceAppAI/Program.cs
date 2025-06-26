@@ -1,7 +1,19 @@
+using EcommerceAppAI.Models;
+using EcommerceAppAI.Hubs;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR();
+builder.Services.Configure<LlmSettings>(builder.Configuration.GetSection("LlmSettings"));
+
+// Add HttpClient for LLM API communication
+builder.Services.AddHttpClient("LlmClient", (serviceProvider, client) =>
+{
+    var llmSettings = builder.Configuration.GetSection("LlmSettings").Get<LlmSettings>();
+    client.BaseAddress = new Uri(llmSettings?.BaseUrl ?? "http://127.0.0.1:1234");
+    client.Timeout = TimeSpan.FromSeconds(llmSettings?.Timeout ?? 30);
+});
 
 var app = builder.Build();
 
@@ -9,7 +21,6 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
@@ -19,6 +30,7 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseAuthorization();
+app.MapHub<ChatHub>("/chathub");
 
 app.MapControllerRoute(
     name: "default",
