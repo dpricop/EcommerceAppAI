@@ -1,10 +1,10 @@
 @model QdrantViewModel
 @{
-    ViewData["Title"] = "Qdrant Connection Test";
+    ViewData["Title"] = "Vector Database Management";
 }
 
 <div style="max-width: 800px; margin: 0 auto;">
-    <h1 style="color: var(--md-sys-color-on-surface); margin-bottom: 2rem;">🔗 Qdrant Connection Test</h1>
+    <h1 style="color: var(--md-sys-color-on-surface); margin-bottom: 2rem;">🔗 Vector Database Management</h1>
 
     @if (TempData["Success"] != null)
     {
@@ -71,7 +71,7 @@
             </p>
         }
         
-        <form method="post" action="@Url.Action("CreateTestCollection")">
+        <form method="post" action="@Url.Action("InitializeCollections")">
             <button type="submit" 
                     style="background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; padding: 12px 24px; border-radius: 24px; cursor: pointer; font-weight: 500;">
                 🚀 Initialize Collections

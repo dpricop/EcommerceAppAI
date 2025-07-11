@@ -41,9 +41,4 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.MapControllerRoute(
-    name: "qdrant-test",
-    pattern: "qdrant-test/{action=Index}",
-    defaults: new { controller = "QdrantTest" });
-
 app.Run();
