@@ -1,4 +1,4 @@
-@model QdrantTestViewModel
+@model QdrantViewModel
 @{
     ViewData["Title"] = "Qdrant Connection Test";
 }
@@ -67,14 +67,14 @@
         else
         {
             <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 1rem;">
-                No collections found. Create a test collection to get started.
+                No collections found. Initialize the vector database to get started with RAG functionality.
             </p>
         }
         
         <form method="post" action="@Url.Action("CreateTestCollection")">
             <button type="submit" 
                     style="background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; padding: 12px 24px; border-radius: 24px; cursor: pointer; font-weight: 500;">
-                ➕ Create Test Collection
+                🚀 Initialize Collections
             </button>
         </form>
     </div>

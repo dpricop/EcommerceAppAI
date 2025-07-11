@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EcommerceAppAI.Controllers;
 
-public class QdrantTestController : Controller
+public class QdrantController : Controller
 {
     private readonly QdrantConnectionService _qdrantService;
-    private readonly ILogger<QdrantTestController> _logger;
+    private readonly ILogger<QdrantController> _logger;
 
-    public QdrantTestController(QdrantConnectionService qdrantService, ILogger<QdrantTestController> logger)
+    public QdrantController(QdrantConnectionService qdrantService, ILogger<QdrantController> logger)
     {
         _qdrantService = qdrantService;
         _logger = logger;
@@ -17,7 +17,7 @@ public class QdrantTestController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var model = new QdrantTestViewModel();
+        var model = new QdrantViewModel();
         
         try
         {
@@ -48,17 +48,17 @@ public class QdrantTestController : Controller
             
             if (success)
             {
-                TempData["Success"] = "Test collection created successfully!";
+                TempData["Success"] = "Collections initialized successfully! Vector database is ready for use.";
             }
             else
             {
-                TempData["Error"] = "Failed to create test collection.";
+                TempData["Error"] = "Failed to initialize collections. Please check Qdrant connection.";
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating test collection");
-            TempData["Error"] = $"Error creating collection: {ex.Message}";
+            _logger.LogError(ex, "Error initializing collections");
+            TempData["Error"] = $"Error initializing collections: {ex.Message}";
         }
 
         return RedirectToAction("Index");
