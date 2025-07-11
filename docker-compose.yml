@@ -8,17 +8,12 @@ services:
       - "6334:6334"  # gRPC API
     volumes:
       - qdrant_data:/qdrant/storage
-    environment:
-      - QDRANT__SERVICE__HTTP_PORT=6333
-      - QDRANT__SERVICE__GRPC_PORT=6334
-    networks:
-      - ecommerce-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
-      interval: 10s
+      interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 3
+      start_period: 10s
 
   # ASP.NET Core Application
   ecommerce-app:
@@ -27,20 +22,15 @@ services:
       dockerfile: EcommerceAppAI/Dockerfile
     container_name: ecommerce-app
     ports:
-      - "5265:8080"  # Only HTTP for simplicity
+      - "5265:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8080  # Only HTTP binding
+      - ASPNETCORE_URLS=http://+:8080
       - LlmSettings__BaseUrl=http://host.docker.internal:1234
-    networks:
-      - ecommerce-network
+      - QdrantSettings__ConnectionString=http://qdrant:6334
     extra_hosts:
-      - "host.docker.internal:host-gateway"  # Access host machine LM Studio
+      - "host.docker.internal:host-gateway"
 
 volumes:
   qdrant_data:
     driver: local
-
-networks:
-  ecommerce-network:
-    driver: bridge
