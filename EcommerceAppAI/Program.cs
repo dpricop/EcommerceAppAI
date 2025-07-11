@@ -1,11 +1,14 @@
 using EcommerceAppAI.Models;
 using EcommerceAppAI.Hubs;
+using EcommerceAppAI.Services;
+using Qdrant.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 builder.Services.Configure<LlmSettings>(builder.Configuration.GetSection("LlmSettings"));
+builder.Services.Configure<QdrantSettings>(builder.Configuration.GetSection("QdrantSettings"));
 
 // Add HttpClient for LLM API communication
 builder.Services.AddHttpClient("LlmClient", (serviceProvider, client) =>
@@ -14,6 +17,24 @@ builder.Services.AddHttpClient("LlmClient", (serviceProvider, client) =>
     client.BaseAddress = new Uri(llmSettings?.BaseUrl ?? "http://127.0.0.1:1234");
     client.Timeout = TimeSpan.FromSeconds(llmSettings?.Timeout ?? 30);
 });
+
+// Add Qdrant Client
+builder.Services.AddSingleton<QdrantClient>(serviceProvider =>
+{
+    var qdrantSettings = builder.Configuration.GetSection("QdrantSettings").Get<QdrantSettings>();
+    var uri = new Uri(qdrantSettings?.ConnectionString ?? "http://localhost:6333");
+    var useHttps = uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase);
+    
+    return new QdrantClient(
+        host: uri.Host, 
+        port: uri.Port, 
+        https: useHttps,
+        grpcTimeout: TimeSpan.FromSeconds(30)
+    );
+});
+
+// Add Qdrant Connection Service
+builder.Services.AddSingleton<QdrantConnectionService>();
 
 var app = builder.Build();
 
