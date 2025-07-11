@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Options;
 using Qdrant.Client;
-using Qdrant.Client.Grpc;
 using EcommerceAppAI.Models;
 
 namespace EcommerceAppAI.Services;
@@ -16,10 +15,8 @@ public class QdrantConnectionService : IDisposable
         _settings = settings.Value;
         _logger = logger;
         
-        // Debug: Log the actual connection string being used
         _logger.LogInformation("QdrantConnectionService initializing...");
         _logger.LogInformation("Connection string from settings: '{ConnectionString}'", _settings.ConnectionString);
-        _logger.LogInformation("Collection name: '{CollectionName}'", _settings.CollectionName);
         
         try
         {
@@ -90,54 +87,8 @@ public class QdrantConnectionService : IDisposable
         }
     }
 
-    public async Task<bool> CreateTestCollectionAsync()
-    {
-        try
-        {
-            _logger.LogInformation("Creating test collection: {CollectionName}", _settings.CollectionName);
-            
-            // Check if collection already exists
-            var collections = await _qdrantClient.ListCollectionsAsync();
-            
-            if (collections.Contains(_settings.CollectionName))
-            {
-                _logger.LogInformation("Collection {CollectionName} already exists", _settings.CollectionName);
-                return true;
-            }
-            
-            // Create collection with simple vector configuration
-            await _qdrantClient.CreateCollectionAsync(_settings.CollectionName, new VectorParams
-            {
-                Size = 384, // Standard embedding dimension for sentence transformers
-                Distance = Distance.Cosine
-            });
-            
-            _logger.LogInformation("Successfully created collection: {CollectionName}", _settings.CollectionName);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create collection {CollectionName}", _settings.CollectionName);
-            return false;
-        }
-    }
-
-    public async Task<List<string>> GetCollectionsAsync()
-    {
-        try
-        {
-            var collections = await _qdrantClient.ListCollectionsAsync();
-            return collections.ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get collections list");
-            return new List<string>();
-        }
-    }
-
     public void Dispose()
     {
-        _qdrantClient?.Dispose();
+        _qdrantClient.Dispose();
     }
 }

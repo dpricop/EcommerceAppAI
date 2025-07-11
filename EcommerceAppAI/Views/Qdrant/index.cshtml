@@ -71,12 +71,24 @@
             </p>
         }
         
-        <form method="post" action="@Url.Action("InitializeCollections")">
-            <button type="submit" 
-                    style="background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; padding: 12px 24px; border-radius: 24px; cursor: pointer; font-weight: 500;">
-                🚀 Initialize Collections
-            </button>
-        </form>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <form method="post" action="@Url.Action("InitializeCollections")">
+                <button type="submit" 
+                        style="background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; padding: 12px 24px; border-radius: 24px; cursor: pointer; font-weight: 500;">
+                    🚀 Initialize Collections
+                </button>
+            </form>
+            
+            @if (Model.Collections.Any())
+            {
+                <form method="post" action="@Url.Action("DropCollections")" onsubmit="return confirmDrop()">
+                    <button type="submit" 
+                            style="background: #dc3545; color: white; border: none; padding: 12px 24px; border-radius: 24px; cursor: pointer; font-weight: 500;">
+                        🗑️ Drop Collections
+                    </button>
+                </form>
+            }
+        </div>
     </div>
 
     <!-- Navigation -->
@@ -94,6 +106,10 @@
 </div>
 
 <script>
+function confirmDrop() {
+    return confirm('⚠️ Warning!\n\nThis will permanently delete ALL collections and data from Qdrant.\n\nAre you sure you want to continue?\n\n🗑️ This action cannot be undone!');
+}
+
 async function refreshStatus() {
     const connectionInfo = document.getElementById('connectionInfo');
     connectionInfo.innerHTML = 'Loading... ⏳';
