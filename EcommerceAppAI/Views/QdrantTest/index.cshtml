@@ -1,0 +1,159 @@
+@model QdrantTestViewModel
+@{
+    ViewData["Title"] = "Qdrant Connection Test";
+}
+
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="color: var(--md-sys-color-on-surface); margin-bottom: 2rem;">🔗 Qdrant Connection Test</h1>
+
+    @if (TempData["Success"] != null)
+    {
+        <div style="background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <strong>✅ Success:</strong> @TempData["Success"]
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div style="background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <strong>❌ Error:</strong> @TempData["Error"]
+        </div>
+    }
+
+    <!-- Connection Status -->
+    <div style="background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-outline); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+        <h2 style="color: var(--md-sys-color-on-surface); margin-bottom: 1rem; display: flex; align-items: center;">
+            <span style="margin-right: 12px;">
+                @if (Model.IsConnected)
+                {
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #10b981; border-radius: 50%;"></span>
+                }
+                else
+                {
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
+                }
+            </span>
+            Connection Status
+        </h2>
+        
+        <div id="connectionInfo" style="background: var(--md-sys-color-surface-variant); padding: 1rem; border-radius: 8px; font-family: monospace; margin-bottom: 1rem;">
+            @Model.ConnectionInfo
+        </div>
+        
+        <button onclick="refreshStatus()" 
+                style="background: var(--md-sys-color-secondary); color: var(--md-sys-color-on-secondary); border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: 500;">
+            🔄 Refresh Status
+        </button>
+    </div>
+
+    <!-- Collections Info -->
+    <div style="background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-outline); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+        <h2 style="color: var(--md-sys-color-on-surface); margin-bottom: 1rem;">📚 Collections</h2>
+        
+        @if (Model.Collections.Any())
+        {
+            <div style="margin-bottom: 1rem;">
+                <strong>Found @Model.Collections.Count collection(s):</strong>
+                <ul style="margin-top: 0.5rem;">
+                    @foreach (var collection in Model.Collections)
+                    {
+                        <li style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 0.25rem;">
+                            📦 @collection
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+        else
+        {
+            <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 1rem;">
+                No collections found. Create a test collection to get started.
+            </p>
+        }
+        
+        <form method="post" action="@Url.Action("CreateTestCollection")">
+            <button type="submit" 
+                    style="background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; padding: 12px 24px; border-radius: 24px; cursor: pointer; font-weight: 500;">
+                ➕ Create Test Collection
+            </button>
+        </form>
+    </div>
+
+    <!-- Navigation -->
+    <div style="text-align: center; margin-top: 2rem;">
+        <a href="@Url.Action("Index", "Home")" 
+           style="display: inline-flex; align-items: center; padding: 12px 24px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); text-decoration: none; border-radius: 24px; font-weight: 500; margin-right: 12px;">
+            🏠 Back to Home
+        </a>
+        
+        <a href="http://localhost:6333/dashboard" target="_blank"
+           style="display: inline-flex; align-items: center; padding: 12px 24px; background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); text-decoration: none; border-radius: 24px; font-weight: 500;">
+            🌐 Qdrant Dashboard
+        </a>
+    </div>
+</div>
+
+<script>
+async function refreshStatus() {
+    const connectionInfo = document.getElementById('connectionInfo');
+    connectionInfo.innerHTML = 'Loading... ⏳';
+    
+    try {
+        const response = await fetch('@Url.Action("GetConnectionStatus")');
+        const data = await response.json();
+        
+        connectionInfo.innerHTML = `${data.info} (Updated: ${data.timestamp})`;
+        
+        // Update status indicator
+        const statusIndicator = document.querySelector('span[style*="border-radius: 50%"]');
+        if (data.isConnected) {
+            statusIndicator.style.background = '#10b981';
+        } else {
+            statusIndicator.style.background = '#ef4444';
+        }
+        
+        // Show success message
+        if (data.isConnected) {
+            showMessage('✅ Connection refreshed successfully!', 'success');
+        } else {
+            showMessage('❌ Connection failed!', 'error');
+        }
+        
+    } catch (error) {
+        connectionInfo.innerHTML = `Error refreshing status: ${error.message}`;
+        showMessage('❌ Failed to refresh status', 'error');
+    }
+}
+
+function showMessage(message, type) {
+    // Remove existing messages
+    const existingMessages = document.querySelectorAll('.temp-message');
+    existingMessages.forEach(msg => msg.remove());
+    
+    // Create new message
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'temp-message';
+    messageDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        z-index: 1000;
+        animation: slideIn 0.3s ease-out;
+        ${type === 'success' ? 
+            'background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;' :
+            'background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;'
+        }
+    `;
+    messageDiv.textContent = message;
+    
+    document.body.appendChild(messageDiv);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        messageDiv.remove();
+    }, 3000);
+}
+</script>
