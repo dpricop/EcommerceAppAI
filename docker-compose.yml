@@ -26,7 +26,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
-      - LlmSettings__BaseUrl=http://host.docker.internal:1234
+      - LlmSettings__BaseUrl=http://host.docker.internal:11434
       - QdrantSettings__ConnectionString=http://qdrant:6334
     extra_hosts:
       - "host.docker.internal:host-gateway"
