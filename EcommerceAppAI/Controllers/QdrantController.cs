@@ -10,16 +10,22 @@ public class QdrantController : Controller
 {
     private readonly QdrantConnectionService _qdrantService;
     private readonly QdrantClient _qdrantClient;
+    private readonly OllamaEmbeddingService _embeddingService;
     private readonly ILogger<QdrantController> _logger;
     
     // Collection names
     private const string ProductsCollection = "products";
     private const string DocumentsCollection = "documents";
 
-    public QdrantController(QdrantConnectionService qdrantService, QdrantClient qdrantClient, ILogger<QdrantController> logger)
+    public QdrantController(
+        QdrantConnectionService qdrantService, 
+        QdrantClient qdrantClient,
+        OllamaEmbeddingService embeddingService,
+        ILogger<QdrantController> logger)
     {
         _qdrantService = qdrantService;
         _qdrantClient = qdrantClient;
+        _embeddingService = embeddingService;
         _logger = logger;
     }
 
@@ -52,19 +58,19 @@ public class QdrantController : Controller
     {
         try
         {
-            _logger.LogInformation("Starting collection initialization...");
+            _logger.LogInformation("Starting collection initialization with real embeddings...");
             
-            // Create both collections
-            var productsCreated = await CreateCollectionIfNotExistsAsync(ProductsCollection);
-            var documentsCreated = await CreateCollectionIfNotExistsAsync(DocumentsCollection);
+            // Create both collections with correct vector size for nomic-embed-text (768 dimensions)
+            var productsCreated = await CreateCollectionIfNotExistsAsync(ProductsCollection, 768);
+            var documentsCreated = await CreateCollectionIfNotExistsAsync(DocumentsCollection, 768);
             
             if (productsCreated && documentsCreated)
             {
-                // Add mock product data
-                await AddMockProductDataAsync();
+                // Add mock product data with real embeddings
+                await AddMockProductDataWithRealEmbeddingsAsync();
                 
-                TempData["Success"] = "Collections initialized successfully! Vector database is ready with products and documents collections, including mock product data.";
-                _logger.LogInformation("Successfully initialized both collections with mock data");
+                TempData["Success"] = "Collections initialized successfully with real Ollama embeddings! Vector database is ready for RAG functionality.";
+                _logger.LogInformation("Successfully initialized both collections with real embeddings");
             }
             else
             {
@@ -156,7 +162,7 @@ public class QdrantController : Controller
     }
 
     // Private helper methods for collection operations
-    private async Task<bool> CreateCollectionIfNotExistsAsync(string collectionName)
+    private async Task<bool> CreateCollectionIfNotExistsAsync(string collectionName, uint vectorSize = 768)
     {
         try
         {
@@ -169,14 +175,15 @@ public class QdrantController : Controller
                 return true;
             }
             
-            // Create collection with vector configuration
+            // Create collection with vector configuration for nomic-embed-text
             await _qdrantClient.CreateCollectionAsync(collectionName, new VectorParams
             {
-                Size = 384, // Standard embedding dimension for sentence transformers
+                Size = vectorSize, // nomic-embed-text produces 768-dimensional embeddings
                 Distance = Distance.Cosine
             });
             
-            _logger.LogInformation("Successfully created collection: {CollectionName}", collectionName);
+            _logger.LogInformation("Successfully created collection: {CollectionName} with {VectorSize}D vectors", 
+                collectionName, vectorSize);
             return true;
         }
         catch (Exception ex)
@@ -186,11 +193,11 @@ public class QdrantController : Controller
         }
     }
     
-    private async Task AddMockProductDataAsync()
+    private async Task AddMockProductDataWithRealEmbeddingsAsync()
     {
         try
         {
-            _logger.LogInformation("Adding mock product data to {ProductsCollection}", ProductsCollection);
+            _logger.LogInformation("Adding mock product data with real embeddings to {ProductsCollection}", ProductsCollection);
             
             // Check if products already exist
             var existingPoints = await _qdrantClient.ScrollAsync(ProductsCollection, limit: 1);
@@ -200,158 +207,73 @@ public class QdrantController : Controller
                 return;
             }
             
-            var mockProducts = GetMockProducts();
+            var mockProducts = MockData.GetMockProducts();
             var points = new List<PointStruct>();
             
-            foreach (var product in mockProducts)
+            // Process products in batches to avoid overwhelming the embedding service
+            var batchSize = 3;
+            var batches = mockProducts.Chunk(batchSize);
+            
+            foreach (var batch in batches)
             {
-                // Generate simple embeddings (in real scenario, use actual embedding service)
-                var vector = GenerateMockEmbedding(product);
+                var batchPoints = new List<PointStruct>();
                 
-                var point = new PointStruct
+                foreach (var product in batch)
                 {
-                    Id = (ulong)product.Id,
-                    Vectors = vector,
-                    Payload = 
+                    try
                     {
-                        ["name"] = product.Name,
-                        ["price"] = (double)product.Price,
-                        ["category"] = product.Category,
-                        ["description"] = product.Description
+                        // Create searchable text combining all product information
+                        var searchableText = $"{product.Name} {product.Category} {product.Description}";
+                        
+                        // Generate real embedding using Ollama
+                        _logger.LogDebug("Generating embedding for product: {ProductName}", product.Name);
+                        var embedding = await _embeddingService.GenerateEmbeddingAsync(searchableText);
+                        
+                        var point = new PointStruct
+                        {
+                            Id = (ulong)product.Id,
+                            Vectors = embedding,
+                            Payload = 
+                            {
+                                ["name"] = product.Name,
+                                ["price"] = (double)product.Price,
+                                ["category"] = product.Category,
+                                ["description"] = product.Description
+                            }
+                        };
+                        
+                        batchPoints.Add(point);
+                        _logger.LogDebug("Generated {EmbeddingDims}D embedding for {ProductName}", 
+                            embedding.Length, product.Name);
                     }
-                };
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to generate embedding for product {ProductName}", product.Name);
+                    }
+                }
                 
-                points.Add(point);
+                // Insert batch
+                if (batchPoints.Any())
+                {
+                    await _qdrantClient.UpsertAsync(ProductsCollection, batchPoints);
+                    points.AddRange(batchPoints);
+                    _logger.LogInformation("Inserted batch of {BatchSize} products", batchPoints.Count);
+                    
+                    // Small delay between batches to be respectful to Ollama
+                    await Task.Delay(100);
+                }
             }
             
-            // Insert all points at once
-            await _qdrantClient.UpsertAsync(ProductsCollection, points);
-            
-            _logger.LogInformation("Successfully added {ProductCount} mock products to {ProductsCollection}", 
+            _logger.LogInformation("Successfully added {ProductCount} products with real embeddings to {ProductsCollection}", 
                 points.Count, ProductsCollection);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to add mock product data");
+            _logger.LogError(ex, "Failed to add mock product data with real embeddings");
+            throw;
         }
     }
     
-    private List<Product> GetMockProducts()
-    {
-        return new List<Product>
-        {
-            new Product 
-            { 
-                Id = 1, 
-                Name = "iPhone 15 Pro", 
-                Price = 999.99m, 
-                Category = "Electronics",
-                Description = "Latest iPhone with Pro features and advanced camera system"
-            },
-            new Product 
-            { 
-                Id = 2, 
-                Name = "MacBook Air M2", 
-                Price = 1199.00m, 
-                Category = "Electronics",
-                Description = "Lightweight laptop with M2 chip and all-day battery life"
-            },
-            new Product 
-            { 
-                Id = 3, 
-                Name = "AirPods Pro", 
-                Price = 249.00m, 
-                Category = "Electronics",
-                Description = "Wireless earbuds with active noise cancellation"
-            },
-            new Product 
-            { 
-                Id = 4, 
-                Name = "Nike Air Jordan", 
-                Price = 180.00m, 
-                Category = "Footwear",
-                Description = "Classic basketball sneakers with iconic design"
-            },
-            new Product 
-            { 
-                Id = 5, 
-                Name = "Levi's 501 Jeans", 
-                Price = 89.99m, 
-                Category = "Clothing",
-                Description = "Original straight fit denim jeans in classic blue"
-            },
-            new Product 
-            { 
-                Id = 6, 
-                Name = "Samsung Galaxy S24", 
-                Price = 899.99m, 
-                Category = "Electronics",
-                Description = "Android smartphone with AI-powered camera and display"
-            },
-            new Product 
-            { 
-                Id = 7, 
-                Name = "Sony WH-1000XM4", 
-                Price = 349.99m, 
-                Category = "Electronics",
-                Description = "Premium noise-canceling over-ear headphones"
-            },
-            new Product 
-            { 
-                Id = 8, 
-                Name = "Adidas Ultraboost", 
-                Price = 160.00m, 
-                Category = "Footwear",
-                Description = "High-performance running shoes with responsive cushioning"
-            },
-            new Product 
-            { 
-                Id = 9, 
-                Name = "The North Face Jacket", 
-                Price = 299.00m, 
-                Category = "Clothing",
-                Description = "Waterproof outdoor jacket for all weather conditions"
-            },
-            new Product 
-            { 
-                Id = 10, 
-                Name = "iPad Pro 12.9", 
-                Price = 1099.00m, 
-                Category = "Electronics",
-                Description = "Professional tablet with M2 chip and Liquid Retina display"
-            }
-        };
-    }
-    
-    private float[] GenerateMockEmbedding(Product product)
-    {
-        // Generate simple mock embeddings based on product properties
-        // In a real scenario, you'd use an actual embedding service
-        var random = new Random(product.Id); // Use ID as seed for consistency
-        var embedding = new float[384];
-        
-        for (int i = 0; i < 384; i++)
-        {
-            embedding[i] = (float)(random.NextDouble() * 2.0 - 1.0); // Range: -1 to 1
-        }
-        
-        // Add some semantic meaning based on category
-        switch (product.Category.ToLower())
-        {
-            case "electronics":
-                for (int i = 0; i < 50; i++) embedding[i] += 0.3f;
-                break;
-            case "clothing":
-                for (int i = 50; i < 100; i++) embedding[i] += 0.3f;
-                break;
-            case "footwear":
-                for (int i = 100; i < 150; i++) embedding[i] += 0.3f;
-                break;
-        }
-        
-        return embedding;
-    }
-
     private async Task<List<string>> GetCollectionsAsync()
     {
         try

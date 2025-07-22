@@ -10,12 +10,15 @@ builder.Services.AddSignalR();
 builder.Services.Configure<LlmSettings>(builder.Configuration.GetSection("LlmSettings"));
 builder.Services.Configure<QdrantSettings>(builder.Configuration.GetSection("QdrantSettings"));
 
-// Add HttpClient for LLM API communication
+// Add HttpClient for Ollama API communication
 builder.Services.AddHttpClient("LlmClient", (serviceProvider, client) =>
 {
     var llmSettings = builder.Configuration.GetSection("LlmSettings").Get<LlmSettings>();
-    client.BaseAddress = new Uri(llmSettings?.BaseUrl ?? "http://127.0.0.1:1234");
-    client.Timeout = TimeSpan.FromSeconds(llmSettings?.Timeout ?? 30);
+    client.BaseAddress = new Uri(llmSettings?.BaseUrl ?? "http://localhost:11434");
+    client.Timeout = TimeSpan.FromSeconds(llmSettings?.Timeout ?? 45);
+    
+    // Add headers for Ollama
+    client.DefaultRequestHeaders.Add("User-Agent", "EcommerceAppAI/1.0");
 });
 
 // Add Qdrant Client
@@ -32,6 +35,10 @@ builder.Services.AddSingleton<QdrantClient>(serviceProvider =>
         grpcTimeout: TimeSpan.FromSeconds(30)
     );
 });
+
+// Add RAG Services
+builder.Services.AddSingleton<OllamaEmbeddingService>();
+builder.Services.AddSingleton<RagService>();
 
 // Add Qdrant Connection Service
 builder.Services.AddSingleton<QdrantConnectionService>();
